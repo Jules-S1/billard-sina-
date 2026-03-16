@@ -1,0 +1,86 @@
+from tkinter import *
+import math
+
+class Particle:
+    def __init__(self, canvas, x, y, vx, vy, color, obs):
+        self.canvas = canvas
+        self.x, self.y = x, y
+        self.vx, self.vy = vx, vy
+        self.color = color
+        self.obs = obs
+        # On crée un petit cercle pour la tête de la particule (optionnel)
+        self.head = canvas.create_oval(x-2, y-2, x+2, y+2, fill=color, outline="")
+
+    def update(self):
+        old_x, old_y = self.x, self.y
+        
+        # 1. Physique de collision (Réflexion vectorielle)
+        # Collision cercle central
+        dx = (self.x + self.vx) - self.obs['cx']
+        dy = (self.y + self.vy) - self.obs['cy']
+        dist = math.sqrt(dx**2 + dy**2)
+        
+        if dist <= self.obs['r']:
+            # Calcul de la normale au point d'impact
+            nx, ny = dx / dist, dy / dist
+            # Formule de réflexion : v' = v - 2 * (v.n) * n
+            dot = self.vx * nx + self.vy * ny
+            self.vx -= 2 * dot * nx
+            self.vy -= 2 * dot * ny
+        
+        # Collision murs extérieurs
+        b = self.obs['billiard']
+        if self.x + self.vx <= b[0] or self.x + self.vx >= b[2]:
+            self.vx *= -1
+        if self.y + self.vy <= b[1] or self.y + self.vy >= b[3]:
+            self.vy *= -1
+
+        # 2. Mise à jour position
+        self.x += self.vx
+        self.y += self.vy
+
+        # 3. Tracé de la LIGNE continue
+        # On crée la ligne entre l'ancienne et la nouvelle position
+        self.canvas.create_line(old_x, old_y, self.x, self.y, fill=self.color, width=1)
+        
+        # Déplacer la "tête" de la particule par-dessus
+        self.canvas.coords(self.head, self.x-2, self.y-2, self.x+2, self.y+2)
+        self.canvas.tag_raise(self.head)
+
+class SinaiApp:
+    def __init__(self, root):
+        self.root = root
+        self.canvas = Canvas(root, width=800, height=800, bg="white", highlightthickness=0)
+        self.canvas.pack()
+
+        # Paramètres
+        self.obs = {'cx': 400, 'cy': 400, 'r': 120, 'billiard': [100, 100, 700, 700]}
+        
+        # Dessin des obstacles (une seule fois)
+        self.canvas.create_oval(400-120, 400-120, 400+120, 400+120, width=3, outline="black")
+        self.canvas.create_rectangle(100, 100, 700, 700, width=3, outline="black")
+
+        # Création des particules (très proches pour voir le chaos)
+        self.particles = []
+        n = 8
+        for i in range(n):
+            # Dégradé de couleur
+            color = f'#{int(i/n*255):02x}00{int(255-i/n*255):02x}'
+            # On varie la position de 0.0001 pour l'effet de divergence
+            p = Particle(self.canvas, 150 + (i*0.0001), 150, 5, 3.5, color, self.obs)
+            self.particles.append(p)
+
+        self.animate()
+
+    def animate(self):
+        # On fait plusieurs calculs par frame pour accélérer la simulation
+        # sans ralentir l'affichage
+        for _ in range(5): 
+            for p in self.particles:
+                p.update()
+        
+        self.root.after(10, self.animate)
+
+root = Tk()
+app = SinaiApp(root)
+root.mainloop()
